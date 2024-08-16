@@ -1,8 +1,6 @@
 package main
 
-import (
-	"fmt"
-)
+import "fmt"
 
 func safeDivide(a, b int) (int, error) {
 	if b == 0 {
@@ -12,8 +10,15 @@ func safeDivide(a, b int) (int, error) {
 	return a / b, nil
 }
 
+func StackOverFlow() {
+	fmt.Println("stack over flow")
+	StackOverFlow()
+}
+
 func main() {
-	defer func() {
+	StackOverFlow()
+
+	/*defer func() {
 		// 使用recover捕获panic
 		if r := recover(); r != nil {
 			fmt.Println("Recovered from", r)
@@ -27,5 +32,5 @@ func main() {
 	}
 	fmt.Println("10 / 0 =", result)
 
-	fmt.Println("11111111111111")
+	fmt.Println("11111111111111")*/
 }
