@@ -8,13 +8,21 @@ import (
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"net/http"
+	"time"
 )
 
 type UserHandler struct {
 	svc         *service.UserService
 	emailExp    *regexp.Regexp
 	passwordExp *regexp.Regexp
+}
+
+type UserClaims struct {
+	jwt.RegisteredClaims
+	// 声明你要放入token中的数据
+	Uid int64
 }
 
 func NewUserHandler(svc *service.UserService) *UserHandler {
@@ -35,7 +43,8 @@ func NewUserHandler(svc *service.UserService) *UserHandler {
 func (u *UserHandler) RegisterRouters(server *gin.Engine) {
 	ug := server.Group("/users")
 	ug.POST("/signup", u.SignUp)
-	ug.POST("/login", u.Login)
+	//ug.POST("/login", u.Login)
+	ug.POST("/login", u.LoginJWT)
 	ug.POST("/edit", u.Edit)
 	ug.GET("/profile", u.Profile)
 	ug.POST("/delete", u.Delete)
@@ -108,6 +117,57 @@ func (u *UserHandler) SignUp(ctx *gin.Context) {
 	})
 }
 
+func (u *UserHandler) LoginJWT(ctx *gin.Context) {
+	type LoginReq struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	var req LoginReq
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	user, err := u.svc.Login(ctx, req.Email, req.Password)
+	if errors.Is(err, service.ErrInvalidUserOrPassword) {
+		ctx.JSON(http.StatusOK, gin.H{
+			"code": 200,
+			"msg":  "邮箱或密码错误",
+		})
+		return
+	}
+	if err != nil {
+		ctx.JSON(http.StatusOK, gin.H{
+			"code": 500,
+			"msg":  "系统异常",
+		})
+		return
+	}
+	// 使用JWT
+	// 生成jwt
+	claims := UserClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * time.Minute)),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+		Uid: user.Id,
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+	tokenStr, err := token.SignedString([]byte("SUwcr3HfInY49a4XVQ03lV4u1AgcQkynTkf5dPbEAknqr8K7zh5WFNLLPgpUocHi"))
+	if err != nil {
+		ctx.JSON(http.StatusOK, gin.H{
+			"code": 500,
+			"msg":  "系统异常",
+		})
+		return
+	}
+	ctx.Header("x-jwt-token", tokenStr)
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"code": 200,
+		"msg":  "登录成功",
+	})
+}
+
 func (u *UserHandler) Login(ctx *gin.Context) {
 	type LoginReq struct {
 		Email    string `json:"email"`
@@ -154,7 +214,8 @@ func (u *UserHandler) Login(ctx *gin.Context) {
 func (u *UserHandler) LoginOut(ctx *gin.Context) {
 	sess := sessions.Default(ctx)
 	sess.Options(sessions.Options{
-		MaxAge: -1,
+		// 一分钟过期
+		MaxAge: 60,
 	})
 	sess.Save()
 	ctx.JSON(http.StatusOK, gin.H{
@@ -162,6 +223,7 @@ func (u *UserHandler) LoginOut(ctx *gin.Context) {
 		"msg":  "退出登录成功！",
 	})
 }
+
 func (u *UserHandler) Edit(ctx *gin.Context) {
 	type EditReq struct {
 		Email    string `json:"email"`
@@ -186,16 +248,18 @@ func (u *UserHandler) Edit(ctx *gin.Context) {
 }
 
 func (u *UserHandler) Profile(ctx *gin.Context) {
-	sess := sessions.Default(ctx)
-	id := sess.Get("userid")
-	if id == nil {
-		ctx.JSON(http.StatusOK, gin.H{
-			"code": 200,
-			"msg":  "请先登录",
-		})
-		return
-	}
-	uid, ok := id.(int64)
+	//sess := sessions.Default(ctx)
+	//id := sess.Get("userid")
+	//if id == nil {
+	//	ctx.JSON(http.StatusOK, gin.H{
+	//		"code": 200,
+	//		"msg":  "请先登录",
+	//	})
+	//	return
+	//}
+	//uid, ok := id.(int64)
+	claims, _ := ctx.Get("userClaims")
+	userClaims, ok := claims.(*UserClaims)
 	if !ok {
 		ctx.JSON(http.StatusOK, gin.H{
 			"code": 500,
@@ -203,7 +267,7 @@ func (u *UserHandler) Profile(ctx *gin.Context) {
 		})
 	}
 
-	user, err := u.svc.Profile(ctx, uid)
+	user, err := u.svc.Profile(ctx, userClaims.Uid)
 	if errors.Is(err, service.ErrUserNotFound) {
 		ctx.JSON(http.StatusOK, gin.H{
 			"code": 200,

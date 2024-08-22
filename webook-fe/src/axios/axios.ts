@@ -1,8 +1,9 @@
 import axios from "axios";
 import router from "next/router";
+
 const instance = axios.create({
     // 这边记得修改你对应的配置文件
-    baseURL:  "http://localhost:8080",
+    baseURL: "http://localhost:8080",
     withCredentials: true
 })
 
@@ -15,7 +16,9 @@ export interface Result<T> {
 
 instance.interceptors.response.use(function (resp) {
     const newToken = resp.headers["x-jwt-token"]
+    console.log("resp headers", resp.headers)
     const newRefreshToken = resp.headers["x-refresh-token"]
+    console.log("token", newToken)
     if (newToken) {
         localStorage.setItem("token", newToken)
     }
@@ -23,13 +26,13 @@ instance.interceptors.response.use(function (resp) {
         localStorage.setItem("refresh_token", newRefreshToken)
     }
     if (resp.status == 401) {
-        window.location.href="/users/login"
+        window.location.href = "/users/login"
     }
     return resp
 }, (err) => {
     console.log(err)
     if (err.response.status == 401) {
-        window.location.href="/users/login"
+        window.location.href = "/users/login"
     }
     return err
 })
