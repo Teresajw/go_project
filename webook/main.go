@@ -7,6 +7,7 @@ import (
 	"github.com/Teresajw/go_project/webook/internal/repository/cache"
 	"github.com/Teresajw/go_project/webook/internal/repository/dao"
 	"github.com/Teresajw/go_project/webook/internal/service"
+	"github.com/Teresajw/go_project/webook/internal/service/sms/memory"
 	"github.com/Teresajw/go_project/webook/internal/web"
 	"github.com/Teresajw/go_project/webook/internal/web/middleware"
 	"github.com/gin-contrib/cors"
@@ -72,16 +73,34 @@ func initWebServer() *gin.Engine {
 	}*/
 
 	server.Use(sessions.Sessions("mySession", store))
-	server.Use(middleware.NewLoginJWTMiddlewareBuilder().IgnorePaths("/users/signup", "/users/login").Build())
+	server.Use(middleware.NewLoginJWTMiddlewareBuilder().IgnorePaths("/users/signup", "/users/login", "/users/login_sms", "/users/login_sms/code/send").Build())
 	return server
 }
 
 func initUser(db *gorm.DB, cmd redis.Cmdable) *web.UserHandler {
-	ud := dao.NewUserDao(db)
-	ca := cache.NewUserCache(cmd, time.Minute*15)
-	repo := repository.NewUserRepository(ud, ca)
-	svc := service.NewUserService(repo)
-	u := web.NewUserHandler(svc)
+	userDao := dao.NewUserDao(db)
+	userCache := cache.NewUserCache(cmd, time.Minute*15)
+	userRepo := repository.NewUserRepository(userDao, userCache)
+	userSvc := service.NewUserService(userRepo)
+	codeCache := cache.NewCodeCache(cmd)
+	codeRepo := repository.NewCodeRepository(codeCache)
+	/*//腾讯短信
+	// 实例化一个认证对象，入参需要传入腾讯云账户 SecretId，SecretKey
+	credential := common.NewCredential(
+		os.Getenv("SECRET_ID"),
+		os.Getenv("SECRET_KEY"),
+	)
+
+	c, err := sms.NewClient(credential, "ap-guangzhou", profile.NewClientProfile())
+	if err != nil {
+		panic("failed to init sms client")
+	}
+	smsSvc := smsi.NewService(c, "", "")*/
+
+	// 测试用的memeory短信
+	smsSvc := memory.NewService()
+	codeSvc := service.NewCodeService(codeRepo, smsSvc)
+	u := web.NewUserHandler(userSvc, codeSvc)
 	return u
 }
 

@@ -8,6 +8,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const DefaultPassword = "123456"
+
 // var ErrDuplicateEmail = fmt.Errorf("%w", repository.ErrDuplicateEmail)
 var (
 	ErrDuplicateEmail        = repository.ErrDuplicateEmail
@@ -69,4 +71,25 @@ func (svc *UserService) SignUp(ctx context.Context, u domain.User) error {
 	u.Password = string(hash)
 	// TODO: 保存到数据库
 	return svc.repo.Create(ctx, u)
+}
+
+func (svc *UserService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
+	u, err := svc.repo.FindByPhone(ctx, phone)
+	if err != nil && !errors.Is(err, ErrUserNotFound) {
+		return u, err
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(DefaultPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return domain.User{}, err
+	}
+	u = domain.User{
+		Phone:    phone,
+		Password: string(hash),
+	}
+	err = svc.repo.Create(ctx, u)
+	if err != nil {
+		return u, err
+	}
+	// 这里会遇到主从延迟的问题
+	return svc.repo.FindByPhone(ctx, phone)
 }

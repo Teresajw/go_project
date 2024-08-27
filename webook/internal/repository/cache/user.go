@@ -21,9 +21,9 @@ type UserCache struct {
 	expiration time.Duration
 }
 
-// A用到了B,B一定是接口
-// A用到了B,B一定是A的字段
-// A用到了B, A一定不初始化B,而是外面注入
+// A用到了B,B一定是接口===>面相接口编程
+// A用到了B,B一定是A的字段===>规避包变量，包方法
+// A用到了B, A一定不初始化B,而是外面注入，依赖注入(Dependecy Injection) 依赖反转(Inversion of Control)
 func NewUserCache(cmd redis.Cmdable, expiration time.Duration) *UserCache {
 	return &UserCache{
 		cmd:        cmd,

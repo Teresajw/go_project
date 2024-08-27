@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"github.com/Teresajw/go_project/webook/internal/domain"
 	"github.com/Teresajw/go_project/webook/internal/repository/cache"
@@ -39,20 +40,8 @@ func (r *UserRepository) FindById(ctx context.Context, id int64) (domain.User, e
 		if err != nil {
 			return domain.User{}, err
 		}
-		// 使用time.Unix和纳秒偏移量来创建time.Time对象
-		ct := time.Unix(user.Ctime/1000, (user.Ctime%1000)*1000000)
-		ut := time.Unix(user.Utime/1000, (user.Ctime%1000)*1000000)
 
-		u = domain.User{
-			Id:       user.Id,
-			Email:    user.Email,
-			Nickname: user.Nickname,
-			Phone:    user.Phone,
-			Birthday: user.Birthday,
-			Profile:  user.Profile,
-			Ctime:    ct,
-			Utime:    ut,
-		}
+		u = r.entityToDomain(user)
 		// 回写cache
 		go func() {
 			// 回写cache
@@ -89,22 +78,47 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (domain.
 	if err != nil {
 		return domain.User{}, err
 	}
-	return domain.User{
-		Id:       u.Id,
-		Email:    u.Email,
-		Password: u.Password,
-	}, nil
+	return r.entityToDomain(u), nil
 	// TODO: 找到了回写cache
 }
 
 func (r *UserRepository) Create(ctx context.Context, u domain.User) error {
-	return r.dao.Insert(ctx, dao.User{
-		Email:    u.Email,
+	return r.dao.Insert(ctx, r.domainToEntity(u))
+	// TODO: 创建成功后，需要回写cache,操作缓存
+}
+
+func (r *UserRepository) FindByPhone(ctx context.Context, phone string) (domain.User, error) {
+	u, err := r.dao.FindByPhone(ctx, phone)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return r.entityToDomain(u), nil
+}
+
+func (r *UserRepository) entityToDomain(ud dao.User) domain.User {
+	return domain.User{
+		Id:       ud.Id,
+		Email:    ud.Email.String,
+		Password: ud.Password,
+		Nickname: ud.Nickname,
+		Phone:    ud.Phone.String,
+		Birthday: ud.Birthday,
+		Profile:  ud.Profile,
+		Ctime:    time.UnixMilli(ud.Ctime),
+		Utime:    time.UnixMilli(ud.Utime),
+	}
+}
+
+func (r *UserRepository) domainToEntity(u domain.User) dao.User {
+	return dao.User{
+		Id:       u.Id,
+		Email:    sql.NullString{String: u.Email, Valid: u.Email != ""},
 		Password: u.Password,
 		Nickname: u.Nickname,
-		Phone:    u.Phone,
+		Phone:    sql.NullString{String: u.Phone, Valid: u.Phone != ""},
 		Birthday: u.Birthday,
 		Profile:  u.Profile,
-	})
-	// TODO: 创建成功后，需要回写cache,操作缓存
+		Ctime:    u.Ctime.UnixMilli(),
+		Utime:    u.Utime.UnixMilli(),
+	}
 }

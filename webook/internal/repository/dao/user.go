@@ -2,6 +2,7 @@ package dao
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
@@ -52,14 +53,20 @@ func (dao *UserDao) Insert(ctx context.Context, u User) error {
 	return err
 }
 
+func (dao *UserDao) FindByPhone(ctx context.Context, phone string) (User, error) {
+	var u User
+	err := dao.db.WithContext(ctx).Where("phone = ?", phone).First(&u).Error
+	return u, err
+}
+
 // User 在Dao中直接对应数据库表结构
 // entity,model,po
 type User struct {
-	Id       int64  `gorm:"primaryKey,autoIncrement"`
-	Email    string `gorm:"unique"`
+	Id       int64          `gorm:"primaryKey,autoIncrement"`
+	Email    sql.NullString `gorm:"unique"`
 	Password string
 	Nickname string
-	Phone    string `gorm:"size:11"`
+	Phone    sql.NullString `gorm:"unique"`
 	Birthday string
 	Profile  string
 	//创建时间，毫秒数
