@@ -17,6 +17,10 @@ const (
 	Biz = "login"
 )
 
+// 确保UserHandler 实现了 handler 接口, 否则编译的时候会报错,以下两种方法，任选其一，第二种没有初始化任何对象，减少内存开销
+// var _ handler = &UserHandler{}
+var _ handler = (*UserHandler)(nil)
+
 type UserHandler struct {
 	svc         *service.UserService
 	codeSvc     *service.CodeService
