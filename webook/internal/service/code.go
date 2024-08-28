@@ -17,16 +17,23 @@ const (
 	TplId = "1548751"
 )
 
-type CodeService struct {
-	repo       *repository.CodeRepository
+var _ CodeService = (*codeService)(nil)
+
+type CodeService interface {
+	Send(ctx context.Context, biz, phone string) error
+	Verify(ctx context.Context, biz, phone, inputCode string) (bool, error)
+}
+
+type codeService struct {
+	repo       repository.CodeRepository
 	smsService sms.Service //这是短信实现的接口
 }
 
-func NewCodeService(repo *repository.CodeRepository, smsService sms.Service) *CodeService {
-	return &CodeService{repo: repo, smsService: smsService}
+func NewCodeService(repo repository.CodeRepository, smsService sms.Service) CodeService {
+	return &codeService{repo: repo, smsService: smsService}
 }
 
-func (svc *CodeService) Send(ctx context.Context, biz, phone string) error {
+func (svc *codeService) Send(ctx context.Context, biz, phone string) error {
 	// 生成验证码
 	code := svc.generateCode()
 	//塞进去redis
@@ -39,12 +46,12 @@ func (svc *CodeService) Send(ctx context.Context, biz, phone string) error {
 
 }
 
-func (svc *CodeService) generateCode() string {
+func (svc *codeService) generateCode() string {
 	num := rand.Intn(1000000)
 	//不够6位补0
 	return fmt.Sprintf("%06d", num)
 }
 
-func (svc *CodeService) Verify(ctx context.Context, biz, phone, inputCode string) (bool, error) {
+func (svc *codeService) Verify(ctx context.Context, biz, phone, inputCode string) (bool, error) {
 	return svc.repo.Verify(ctx, biz, phone, inputCode)
 }

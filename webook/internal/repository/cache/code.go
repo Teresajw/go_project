@@ -25,17 +25,24 @@ var (
 	ErrUnknownError      = errors.New("unknown error")
 )
 
-type CodeCache struct {
+var _ CodeCache = (*RedisCodeCache)(nil)
+
+type CodeCache interface {
+	Set(ctx context.Context, biz, phone, code string) error
+	Verify(ctx context.Context, biz, phone, inputCode string) (bool, error)
+}
+
+type RedisCodeCache struct {
 	//传单机redis可以
 	// 传集群redis
 	cmd redis.Cmdable
 }
 
-func NewCodeCache(cmd redis.Cmdable) *CodeCache {
-	return &CodeCache{cmd: cmd}
+func NewCodeCache(cmd redis.Cmdable) CodeCache {
+	return &RedisCodeCache{cmd: cmd}
 }
 
-func (c *CodeCache) Set(ctx context.Context, biz, phone, code string) error {
+func (c *RedisCodeCache) Set(ctx context.Context, biz, phone, code string) error {
 	val, err := c.cmd.Eval(ctx, luaSetCode, []string{c.key(biz, phone)}, code).Int64()
 	if err != nil {
 		return err
@@ -55,11 +62,11 @@ func (c *CodeCache) Set(ctx context.Context, biz, phone, code string) error {
 	}
 }
 
-func (c *CodeCache) key(biz, phone string) string {
+func (c *RedisCodeCache) key(biz, phone string) string {
 	return fmt.Sprintf("phone_code:%s:%s", biz, phone)
 }
 
-func (c *CodeCache) Verify(ctx context.Context, biz, phone, inputCode string) (bool, error) {
+func (c *RedisCodeCache) Verify(ctx context.Context, biz, phone, inputCode string) (bool, error) {
 	val, err := c.cmd.Eval(ctx, luaVerifyCode, []string{c.key(biz, phone)}, inputCode).Int()
 	if err != nil {
 		return false, err
