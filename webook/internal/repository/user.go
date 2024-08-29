@@ -50,10 +50,12 @@ func (r *userRepository) UpdateNoSensitiveInfo(ctx context.Context, user domain.
 	if err != nil {
 		return err
 	}
-	err = r.cache.Set(ctx, r.entityToDomain(u))
-	if err != nil {
-		return err
-	}
+	go func() {
+		err = r.cache.Set(ctx, r.entityToDomain(u))
+		if err != nil {
+			// 写日志就行
+		}
+	}()
 	return nil
 
 }
