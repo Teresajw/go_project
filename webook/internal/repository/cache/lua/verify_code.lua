@@ -7,7 +7,7 @@ local expectedCode = ARGV[1]
 local cnt = tonumber(redis.call("get", cntKey))
 local code = redis.call("get", key)
 
-if cnt <= 0 then
+if cnt == nil or cnt <= 0 then
     --说明一直输入错误,有人搞你
     return -1
 end
