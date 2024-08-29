@@ -23,6 +23,7 @@ type UserRepository interface {
 	FindByEmail(ctx context.Context, email string) (domain.User, error)
 	Create(ctx context.Context, user domain.User) error
 	FindByPhone(ctx context.Context, phone string) (domain.User, error)
+	UpdateNoSensitiveInfo(ctx context.Context, user domain.User) error
 }
 
 type userRepository struct {
@@ -35,6 +36,26 @@ func NewUserRepository(dao dao.UserDao, cache cache.UserCache) UserRepository {
 		dao:   dao,
 		cache: cache,
 	}
+}
+
+func (r *userRepository) UpdateNoSensitiveInfo(ctx context.Context, user domain.User) error {
+	u, err := r.dao.FindById(ctx, user.Id)
+	if err != nil {
+		return err
+	}
+	u.Nickname = user.Nickname
+	u.Birthday = user.Birthday
+	u.Profile = user.Profile
+	err = r.dao.UpdateNoSensitiveInfo(ctx, user.Id, u)
+	if err != nil {
+		return err
+	}
+	err = r.cache.Set(ctx, r.entityToDomain(u))
+	if err != nil {
+		return err
+	}
+	return nil
+
 }
 
 func (r *userRepository) FindById(ctx context.Context, id int64) (domain.User, error) {

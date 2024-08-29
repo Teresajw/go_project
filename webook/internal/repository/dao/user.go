@@ -21,6 +21,7 @@ type UserDao interface {
 	FindByEmail(ctx context.Context, email string) (User, error)
 	Insert(ctx context.Context, u User) error
 	FindByPhone(ctx context.Context, phone string) (User, error)
+	UpdateNoSensitiveInfo(ctx context.Context, id int64, u User) error
 }
 
 type GormUserDao struct {
@@ -31,6 +32,11 @@ func NewUserDao(db *gorm.DB) UserDao {
 	return &GormUserDao{
 		db: db,
 	}
+}
+
+func (dao *GormUserDao) UpdateNoSensitiveInfo(ctx context.Context, id int64, u User) error {
+	//更新部分字段，忽略敏感信息
+	return dao.db.WithContext(ctx).Model(&u).Where("id = ?", id).Updates(&u).Error
 }
 
 func (dao *GormUserDao) FindById(ctx context.Context, id int64) (User, error) {

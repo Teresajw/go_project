@@ -121,10 +121,10 @@ func (u *UserHandler) SignUp(ctx *gin.Context) {
 		return
 	}
 	//数据库操作
-	ctx.JSON(http.StatusOK, gin.H{
-		"code": 200,
-		"msg":  "注册成功！",
-		"data": gin.H{
+	ctx.JSON(http.StatusOK, Result{
+		Code: 200,
+		Msg:  "注册成功！",
+		Data: gin.H{
 			"email": req.Email,
 		},
 	})
@@ -141,9 +141,9 @@ func (u *UserHandler) LoginJWT(ctx *gin.Context) {
 	}
 	user, err := u.svc.Login(ctx, req.Email, req.Password)
 	if errors.Is(err, service.ErrInvalidUserOrPassword) {
-		ctx.JSON(http.StatusOK, gin.H{
-			"code": 200,
-			"msg":  "邮箱或密码错误",
+		ctx.JSON(http.StatusOK, Result{
+			Code: 200,
+			Msg:  "邮箱或密码错误",
 		})
 		return
 	}
@@ -230,10 +230,10 @@ func (u *UserHandler) LoginOut(ctx *gin.Context) {
 
 func (u *UserHandler) Edit(ctx *gin.Context) {
 	type EditReq struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		//Email    string `json:"email"`
+		//Password string `json:"password"`
 		Nickname string `json:"nickname"`
-		Phone    string `json:"phone"`
+		//Phone    string `json:"phone"`
 		Birthday string `json:"birthday"`
 		Profile  string `json:"profile"`
 	}
@@ -241,14 +241,55 @@ func (u *UserHandler) Edit(ctx *gin.Context) {
 	if err := ctx.Bind(&req); err != nil {
 		return
 	}
-	//u.svc.Edit(ctx, domain.User{
-	//	Email:    req.Email,
-	//	Password: <PASSWORD>,
-	//	Nickname: req.Nickname,
-	//	Phone:    req.Phone,
-	//	Birthday: req.Birthday,
-	//	Profile:  req.Profile,
-	//})
+	if req.Nickname == "" {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 200,
+			Msg:  "昵称不能为空",
+		})
+		return
+	}
+	if len(req.Profile) > 1024 {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 200,
+			Msg:  "简介不能超过1024个字符",
+		})
+		return
+	}
+
+	claims, _ := ctx.Get("userClaims")
+	userClaims, ok := claims.(*UserClaims)
+	if !ok {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 500,
+			Msg:  "系统异常",
+		})
+	}
+
+	err := u.svc.UpdateNoSensitiveInfo(ctx, domain.User{
+		Id:       userClaims.Uid,
+		Nickname: req.Nickname,
+		Birthday: req.Birthday,
+		Profile:  req.Profile,
+	})
+	switch {
+	case errors.Is(err, service.ErrUserNotFound):
+		ctx.JSON(http.StatusOK, Result{
+			Code: 200,
+			Msg:  "修改失败,用户不存在",
+		})
+		return
+	case err == nil:
+		ctx.JSON(http.StatusOK, Result{
+			Code: 500,
+			Msg:  "修改成功",
+		})
+	default:
+		ctx.JSON(http.StatusOK, Result{
+			Code: 200,
+			Msg:  "系统异常",
+		})
+		return
+	}
 }
 
 func (u *UserHandler) Profile(ctx *gin.Context) {
